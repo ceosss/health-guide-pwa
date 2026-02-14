@@ -18,23 +18,33 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError("")
+    
+    console.log("Attempting login...")
+    
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
+    
+    console.log("Login response:", { data, error })
+    
     if (error) {
       setError(error.message)
       setLoading(false)
       return
     }
+    
     if (!data.session) {
       setError("Login failed - no session created")
       setLoading(false)
       return
     }
-    // Small delay to ensure cookie is set
-    await new Promise(resolve => setTimeout(resolve, 100))
-    window.location.href = "/dashboard"
+    
+    console.log("Session created:", data.session.user.email)
+    console.log("Redirecting to dashboard...")
+    
+    // Force full page reload to ensure middleware picks up the session
+    window.location.replace("/dashboard")
   }
   const handleMagicLink = async () => {
     if (!email) {
