@@ -29,7 +29,7 @@ export default function SignupPage() {
       setLoading(false)
       return
     }
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -41,8 +41,13 @@ export default function SignupPage() {
       setLoading(false)
       return
     }
-    router.refresh()
-    router.push("/onboarding")
+    if (!data.session) {
+      setError("Account created but auto-login failed. Please sign in manually.")
+      setLoading(false)
+      return
+    }
+    // Force full page reload for session to be recognized
+    window.location.replace("/onboarding")
   }
   return (
     <Card className="w-full">
