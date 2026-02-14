@@ -58,11 +58,15 @@ export async function middleware(request: NextRequest) {
 
   // Check onboarding status for protected routes
   if (isProtectedRoute && user) {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
       .select('onboarding_complete')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
+
+    if (profileError) {
+      console.error('Error checking profile:', profileError)
+    }
 
     if (!profile?.onboarding_complete && pathname !== '/onboarding') {
       const url = request.nextUrl.clone()

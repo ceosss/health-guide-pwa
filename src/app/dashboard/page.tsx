@@ -17,11 +17,15 @@ export default async function DashboardPage() {
   }
 
   // Fetch user profile
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
     .select("*")
     .eq("user_id", user.id)
-    .single()
+    .maybeSingle()
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError)
+  }
 
   if (!profile?.onboarding_complete) {
     redirect("/onboarding")
@@ -36,7 +40,7 @@ export default async function DashboardPage() {
     .select("*")
     .eq("user_id", user.id)
     .eq("date", today)
-    .single()
+    .maybeSingle()
 
   // Fetch today's skin log
   const { data: skinLog } = await supabase
@@ -44,7 +48,7 @@ export default async function DashboardPage() {
     .select("*")
     .eq("user_id", user.id)
     .eq("date", today)
-    .single()
+    .maybeSingle()
 
   // Fetch today's food logs
   const { data: foodLogs } = await supabase
@@ -68,7 +72,7 @@ export default async function DashboardPage() {
     .select("glasses")
     .eq("user_id", user.id)
     .eq("date", today)
-    .single()
+    .maybeSingle()
 
   // Fetch streak count
   const { data: workoutHistory } = await supabase
