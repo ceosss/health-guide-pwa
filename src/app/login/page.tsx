@@ -18,7 +18,7 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError("")
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -27,8 +27,14 @@ export default function LoginPage() {
       setLoading(false)
       return
     }
-    router.refresh()
-    router.push("/dashboard")
+    if (!data.session) {
+      setError("Login failed - no session created")
+      setLoading(false)
+      return
+    }
+    // Small delay to ensure cookie is set
+    await new Promise(resolve => setTimeout(resolve, 100))
+    window.location.href = "/dashboard"
   }
   const handleMagicLink = async () => {
     if (!email) {
