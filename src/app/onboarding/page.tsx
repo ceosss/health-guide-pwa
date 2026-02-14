@@ -26,6 +26,8 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   
+  const [error, setError] = useState<string | null>(null)
+  
   const [formData, setFormData] = useState({
     height_cm: "",
     weight_kg: "",
@@ -79,58 +81,79 @@ export default function OnboardingPage() {
   }
   const completeOnboarding = async () => {
     setLoading(true)
+    setError(null)
     
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    // Calculate TDEE and macros
-    const weight = parseFloat(formData.weight_kg)
-    const height = parseFloat(formData.height_cm)
-    const age = parseInt(formData.age)
-    const isMale = formData.gender === "male"
-    
-    // BMR using Mifflin-St Jeor
-    let bmr = (10 * weight) + (6.25 * height) - (5 * age)
-    bmr = isMale ? bmr + 5 : bmr - 161
-    
-    // TDEE with moderate activity (1.55)
-    let tdee = Math.round(bmr * 1.55)
-    
-    // Goal adjustment
-    const goalAdjustments: Record<string, number> = {
-      lose_fat: -500,
-      build_muscle: 300,
-      body_recomp: 0,
-      bulk: 500,
-      athletic: -250,
-      lean_toned: -250,
-      maintain: 0,
-    }
-    
-    const dailyCalories = tdee + (goalAdjustments[formData.goal] || 0)
-    const protein = Math.round(weight * 2)
-    const fat = Math.round((dailyCalories * 0.25) / 9)
-    const carbs = Math.round((dailyCalories - (protein * 4) - (fat * 9)) / 4)
-    const { error } = await supabase
-      .from("user_profiles")
-      .upsert({
-        user_id: user.id,
-        ...formData,
-        height_cm: height,
-        weight_kg: weight,
-        age: age,
-        target_weight_kg: formData.target_weight_kg ? parseFloat(formData.target_weight_kg) : null,
-        timeline_months: parseInt(formData.timeline_months),
-        workout_duration_min: parseInt(formData.workout_duration_min),
-        daily_calories_target: dailyCalories,
-        daily_protein_g: protein,
-        daily_carbs_g: carbs,
-        daily_fat_g: fat,
-        onboarding_complete: true,
-      })
-    if (error) {
-      console.error("Error completing onboarding:", error)
-    } else {
-      router.push("/dashboard")
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) {
+        setError("You must be logged in to complete onboarding. Please sign up or log in first.")
+        setLoading(false)
+        return
+      }
+      
+      // Validate required fields
+      if (!formData.weight_kg || !formData.height_cm || !formData.age || !formData.gender) {
+        setError("Please fill in all basic info (height, weight, age, gender) in step 1.")
+        setLoading(false)
+        return
+      }
+      
+      // Calculate TDEE and macros
+      const weight = parseFloat(formData.weight_kg)
+      const height = parseFloat(formData.height_cm)
+      const age = parseInt(formData.age)
+      const isMale = formData.gender === "male"
+      
+      // BMR using Mifflin-St Jeor
+      let bmr = (10 * weight) + (6.25 * height) - (5 * age)
+      bmr = isMale ? bmr + 5 : bmr - 161
+      
+      // TDEE with moderate activity (1.55)
+      let tdee = Math.round(bmr * 1.55)
+      
+      // Goal adjustment
+      const goalAdjustments: Record<string, number> = {
+        lose_fat: -500,
+        build_muscle: 300,
+        body_recomp: 0,
+        bulk: 500,
+        athletic: -250,
+        lean_toned: -250,
+        maintain: 0,
+      }
+      
+      const dailyCalories = tdee + (goalAdjustments[formData.goal] || 0)
+      const protein = Math.round(weight * 2)
+      const fat = Math.round((dailyCalories * 0.25) / 9)
+      const carbs = Math.round((dailyCalories - (protein * 4) - (fat * 9)) / 4)
+      
+      const { error: upsertError } = await supabase
+        .from("user_profiles")
+        .upsert({
+          user_id: user.id,
+          ...formData,
+          height_cm: height,
+          weight_kg: weight,
+          age: age,
+          target_weight_kg: formData.target_weight_kg ? parseFloat(formData.target_weight_kg) : null,
+          timeline_months: parseInt(formData.timeline_months),
+          workout_duration_min: parseInt(formData.workout_duration_min),
+          daily_calories_target: dailyCalories,
+          daily_protein_g: protein,
+          daily_carbs_g: carbs,
+          daily_fat_g: fat,
+          onboarding_complete: true,
+        })
+        
+      if (upsertError) {
+        console.error("Error completing onboarding:", upsertError)
+        setError(`Save failed: ${upsertError.message}`)
+      } else {
+        router.push("/dashboard")
+      }
+    } catch (err: any) {
+      console.error("Unexpected error:", err)
+      setError(`An error occurred: ${err.message}`)
     }
     setLoading(false)
   }
@@ -420,6 +443,11 @@ export default function OnboardingPage() {
           <Progress value={progress} className="mb-4" />
         </CardHeader>
         <CardContent className="space-y-6">
+          {error && (
+            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
+              {error}
+            </div>
+          )}
           {renderStep()}
           
           <div className="flex gap-2">
